@@ -176,17 +176,3 @@ class ArticlesController extends Controller
         ]);
     }
 }
-
-
-
-// {
-//     "nomArticle": "T-shirt",
-//     "description": "T-shirt en coton",
-//     "photo": "articles/1623152651_T-shirt.jpg",
-//     "prixArticle": 20,
-//     "reference": 123456,
-//     "taille": "M",
-//     "couleur": "Blanc",
-//     "categorie": "Vêtements",
-//     "idCreateur": 1,
-// }

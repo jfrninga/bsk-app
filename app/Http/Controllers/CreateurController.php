@@ -215,22 +215,3 @@ class CreateurController extends Controller
         ]);
     }
 }
-
-
-
-// {
-//     "genre" : "Mr",
-//     "nom" : "jf",
-//     "prenom" : "Toto",
-//     "dateNaissance" : "1970-01-15",
-//     "email": "jf@toto.com",
-//     "mdpCreateur" : "mdpjf1234",
-//     "telCreateur" : "+33622000000",
-//     "numRue" : "74",
-//     "rue" : "bechevelin",
-//     "codePostal" : "69007",
-//     "ville" : "Lyon",
-//     "pays" : "France",
-//     "debutActivite" : "2018-05-15",
-//     "siret" : "1234567890"
-// }

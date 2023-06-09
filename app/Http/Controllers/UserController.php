@@ -237,15 +237,4 @@ class UserController extends Controller
     //         : response()->json(['message' => __($status)]);
     // }
 
-
-    // public function logoutUser()
-    // {
-    //     auth()->user()->tokens()->each(function ($token, $key) {
-    //         $token->delete();
-    //     });
-    //     return response()->json([
-    //         "message" => "Déconnexion réussie",
-    //         "status" => 200,
-    //     ]);
-    // }
 }
