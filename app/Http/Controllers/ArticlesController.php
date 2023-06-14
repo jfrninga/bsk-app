@@ -175,4 +175,80 @@ class ArticlesController extends Controller
             'status' => 200,
         ]);
     }
+
+    // recherche par categorie
+    public function searchByCategorie(Request $request)
+    {
+        $query = Articles::query();
+        if ($request->has('categorie')) {
+            $categorie = $request->input('categorie');
+            if (substr($categorie, -2) == "'s") {
+                $categorie = substr($categorie, 0, -2);
+            }
+            $query->where('categorie', 'like', '%' . $categorie . '%');
+        }
+        if ($request->has('nomArticle')) {
+            $nomArticle = $request->input('nomArticle');
+            if (substr($nomArticle, -2) == "'s") {
+                $nomArticle = substr($nomArticle, 0, -2);
+            }
+            $query->where('nomArticle', 'like', '%' . $nomArticle . '%');
+        }
+        if ($request->has('description')) {
+            $description = $request->input('description');
+            if (substr($description, -2) == "'s") {
+                $description = substr($description, 0, -2);
+            }
+            $query->where('description', 'like', '%' . $description . '%');
+        }
+        if ($request->has('couleur')) {
+            $couleur = $request->input('couleur');
+            if (substr($couleur, -2) == "'s") {
+                $couleur = substr($couleur, 0, -2);
+            }
+            $query->where('couleur', 'like', '%' . $couleur . '%');
+        }
+        $articles = $query->orderBy('created_at', 'desc')->get();
+        return response()->json($articles);
+    }
+
+    // filtre
+    public function filter(Request $request)
+    {
+        // Récupérer les paramètres de filtre de la requête
+        $taille = $request->input('taille');
+        $couleur = $request->input('couleur');
+        $prixMin = $request->input('prixMin');
+        $prixMax = $request->input('prixMax');
+        $categorie = $request->input('categorie');
+
+        // Construire la requête de filtre
+        $query = Articles::query();
+
+        if ($taille) {
+            $query->whereRaw('LOWER(taille) = ?', [strtolower($taille)]);
+        }
+
+        if ($couleur) {
+            $query->whereRaw('LOWER(couleur) = ?', [strtolower($couleur)]);
+        }
+
+        if ($prixMin) {
+            $query->where('prixArticle', '>=', $prixMin);
+        }
+
+        if ($prixMax) {
+            $query->where('prixArticle', '<=', $prixMax);
+        }
+
+        if ($categorie) {
+            $query->whereRaw('LOWER(categorie) = ?', [strtolower($categorie)]);
+        }
+
+        // Récupérer les articles filtrés
+        $articles = $query->get();
+
+        // Retourner les articles filtrés
+        return response()->json($articles);
+    }
 }

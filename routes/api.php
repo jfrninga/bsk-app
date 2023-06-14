@@ -36,6 +36,12 @@ Route::delete("/delete/createur/{idCreateur}", [CreateurController::class, "dele
 Route::get("/articles", [ArticlesController::class, "index"]);
 Route::get("/articles/{idArticle}", [ArticlesController::class, "show"]);
 
+// for research
+Route::get('/articles', [ArticlesController::class, "searchByCategorie"]);
+
+// for filter
+Route::get('/filter', [ArticlesController::class, 'filter']);
+
 
 Route::group(['middleware' => ['auth:sanctum', 'check.article.owner']], function () {
     Route::post("/articles", [ArticlesController::class, "store"]);
