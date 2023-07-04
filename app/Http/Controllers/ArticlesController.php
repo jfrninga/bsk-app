@@ -2,13 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Repositories\ArticleRepository;
 use App\Models\Articles;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 class ArticlesController extends Controller
 {
+
+    private $articlesRepository;
+
+    public function __construct(ArticleRepository $articlesRepository)
+    {
+        $this->articlesRepository = $articlesRepository;
+    }
+
     /**
      * Display a listing of the resource.
      *
@@ -16,7 +24,7 @@ class ArticlesController extends Controller
      */
     public function index()
     {
-        $articles = Articles::all();
+        $articles = $this->articlesRepository->getAllArticles();
         if (count($articles) <= 0) {
             return response()->json(["message" => "Pas d'articles"], 404);
         }
@@ -59,8 +67,8 @@ class ArticlesController extends Controller
             $articleDonnee['photoArticle'] = str_replace('public/', '', $path);
         }
 
-        // Créer un nouvel article
-        Articles::create($articleDonnee);
+        // Créer un nouvel article en utilisant le ArticleRepository
+        $article = $this->articlesRepository->createArticle($articleDonnee);
 
         // Redirection ou autre traitement
         return response()->json([
@@ -97,6 +105,8 @@ class ArticlesController extends Controller
      */
     public function update(Request $request, $idArticle)
     {
+        $articleDonnee = [];
+
         // Valider les données de la requête
         $articleValidation = $request->validate([
             'nomArticle' => ["string", "max:100"],
@@ -120,18 +130,14 @@ class ArticlesController extends Controller
             $articleDonnee['photoArticle'] = str_replace('public/', '', $path);
         }
 
-        // verifier si l'article existe
-        $article = Articles::findOrfail($idArticle);
-        // if (!$article) {
-        //     return response()->json(["message" => "Article non trouvé avec cet id $idArticle"], 404);
-        // }
+        // Récupérer l'article dans la base de données
+        $article = app(ArticleRepository::class)->updateArticle($idArticle, $articleValidation, $request->createur()->id);
+
         // Vérifier si l'utilisateur est autorisé à modifier l'article
         if ($article->idCreateur != $request->createur()->id) {
             return response()->json(["message" => "Vous n'êtes pas autorisé à modifier cet article"], 401);
         }
 
-        // Récupérer l'id de l'article dans la requête
-        // $article = Articles::where('idArticle', $request->idArticle)->first();
         // Mettre à jour l'article
         $article->update($articleValidation);
 
@@ -154,20 +160,9 @@ class ArticlesController extends Controller
         $articleValidation = $request->validate([
             'idCreateur' => ["required", "integer"],
         ]);
-        // verifier si l'article existe
-        $article = Articles::find($idArticle);
-        if (!$article) {
-            return response()->json(["message" => "Article non trouvé avec cet id $idArticle"], 404);
-        }
-        // Vérifier si l'utilisateur est autorisé à supprimer l'article
-        if ($article->idCreateur != $articleValidation['idCreateur']) {
-            return response()->json(["message" => "Vous n'êtes pas autorisé à supprimer cet article"], 401);
-        }
 
-        // Récupérer l'id de l'article dans la requête
-        $article = Articles::where('idArticle', $request->idArticle)->first();
-        // Supprimer l'article
-        $article->delete();
+        // supprimer l'article à partir de ArticleRepository
+        app(ArticleRepository::class)->deleteArticle($idArticle);
 
         // Redirection ou autre traitement
         return response()->json([
@@ -179,36 +174,7 @@ class ArticlesController extends Controller
     // recherche par categorie
     public function searchByCategorie(Request $request)
     {
-        $query = Articles::query();
-        if ($request->has('categorie')) {
-            $categorie = $request->input('categorie');
-            if (substr($categorie, -2) == "'s") {
-                $categorie = substr($categorie, 0, -2);
-            }
-            $query->where('categorie', 'like', '%' . $categorie . '%');
-        }
-        if ($request->has('nomArticle')) {
-            $nomArticle = $request->input('nomArticle');
-            if (substr($nomArticle, -2) == "'s") {
-                $nomArticle = substr($nomArticle, 0, -2);
-            }
-            $query->where('nomArticle', 'like', '%' . $nomArticle . '%');
-        }
-        if ($request->has('description')) {
-            $description = $request->input('description');
-            if (substr($description, -2) == "'s") {
-                $description = substr($description, 0, -2);
-            }
-            $query->where('description', 'like', '%' . $description . '%');
-        }
-        if ($request->has('couleur')) {
-            $couleur = $request->input('couleur');
-            if (substr($couleur, -2) == "'s") {
-                $couleur = substr($couleur, 0, -2);
-            }
-            $query->where('couleur', 'like', '%' . $couleur . '%');
-        }
-        $articles = $query->orderBy('created_at', 'desc')->get();
+        $articles = $this->articlesRepository->searchByCategorie($request);
         return response()->json($articles);
     }
 
@@ -222,33 +188,10 @@ class ArticlesController extends Controller
         $prixMax = $request->input('prixMax');
         $categorie = $request->input('categorie');
 
-        // Construire la requête de filtre
-        $query = Articles::query();
-
-        if ($taille) {
-            $query->whereRaw('LOWER(taille) = ?', [strtolower($taille)]);
-        }
-
-        if ($couleur) {
-            $query->whereRaw('LOWER(couleur) = ?', [strtolower($couleur)]);
-        }
-
-        if ($prixMin) {
-            $query->where('prixArticle', '>=', $prixMin);
-        }
-
-        if ($prixMax) {
-            $query->where('prixArticle', '<=', $prixMax);
-        }
-
-        if ($categorie) {
-            $query->whereRaw('LOWER(categorie) = ?', [strtolower($categorie)]);
-        }
-
-        // Récupérer les articles filtrés
-        $articles = $query->get();
+        // Appeler la méthode du repository pour effectuer le filtrage
+        $filteredArticles = app(ArticleRepository::class)->filterArticles($taille, $couleur, $prixMin, $prixMax, $categorie);
 
         // Retourner les articles filtrés
-        return response()->json($articles);
+        return response()->json($filteredArticles);
     }
 }

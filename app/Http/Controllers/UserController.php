@@ -2,16 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Repositories\UserRepository;
 use App\Mail\InscriptionUserMail;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
+    private $userRepository;
+
+    public function __construct(UserRepository $userRepository)
+    {
+        $this->userRepository = $userRepository;
+    }
+
     public function createUser(Request $request)
     {
         // créer un utilisateur
@@ -29,10 +36,8 @@ class UserController extends Controller
             "ville" => ["nullable", "string", "max:30"],
             "pays" => ["nullable", "string", "max:30"],
         ]);
-        // hasher le mot de passe
-        $userDonnee["mdp_user"] = Hash::make($userDonnee["mdp_user"]);
         // enregistrer l'utilisateur dans la base de données
-        $user = User::create($userDonnee);
+        $user = $this->userRepository->createUser($userDonnee);
         // retourner la réponse quand l'utilisateur est créé
 
         Mail::to($userDonnee["email"])->send(new InscriptionUserMail($userDonnee));
@@ -98,7 +103,7 @@ class UserController extends Controller
         ]);
 
         // vérifier si l'utilisateur existe avec le bon mot de passe
-        $user = User::where("email", $userDonnee["email"])->first();
+        $user = $this->userRepository->findByEmail($userDonnee["email"]);
         if (!$user || !Hash::check($userDonnee["mdp_user"], $user->mdp_user)) {
             return response()->json([
                 "message" => "Email ou mot de passe incorrect",
@@ -150,29 +155,14 @@ class UserController extends Controller
         // fusionner les données validées avec les données actuelles
         $updatedData = array_merge($currentDonnee, array_filter($userDonnee));
 
-        // mettre à jour les données de l'utilisateur
-        $sql = "UPDATE users SET nom=:nom, prenom=:prenom, date_naissance=:date_naissance, email=:email,
-                    mdp_user=:mdp_user, num_tel=:num_tel, numRue=:numRue, rue=:rue, codePostal=:codePostal,
-                    ville=:ville, pays=:pays WHERE idUser=:idUser";
-        $updatedDonnee = [
-            "nom" => $updatedData["nom"],
-            "prenom" => $updatedData["prenom"],
-            "date_naissance" => $updatedData["date_naissance"],
-            "email" => $updatedData["email"],
-            "mdp_user" => $updatedData["mdp_user"],
-            "num_tel" => $updatedData["num_tel"],
-            "numRue" => $updatedData["numRue"],
-            "rue" => $updatedData["rue"],
-            "codePostal" => $updatedData["codePostal"],
-            "ville" => $updatedData["ville"],
-            "pays" => $updatedData["pays"],
-            "idUser" => $userDonnee["idUser"],
-        ];
-        $result = DB::statement($sql, $updatedDonnee);
+        // mettre à jour les données de l'utilisateur via le UserRepository
+        $userRepository = new UserRepository();
+        $updatedUser = $userRepository->updateUser($updatedData);
+
         // retourner la réponse quand l'utilisateur est mis à jour
-        if ($result) {
+        if ($updatedUser) {
             return response()->json([
-                "user" => $updatedData,
+                "user" => $updatedUser,
                 "message" => "Utilisateur mis à jour avec succès",
             ]);
         } else {
@@ -190,27 +180,20 @@ class UserController extends Controller
             'mdp_user' => ['required', 'string', 'min:8', 'max:30'],
         ]);
 
-        // récupérer l'id de l'utilisateur
-        $user = User::findorFail($idUser);
+        // Appeler la méthode deleteUser du UserRepository
+        $result = $this->userRepository->deleteUser($idUser, $request->input('mdp_user'));
 
-        // vérifier si le mot de passe est correct
-        if (!Hash::check($request->mdp_user, $user->mdp_user)) {
+        if ($result) {
+            return response()->json([
+                "message" => "Utilisateur supprimé avec succès",
+                "status" => 200,
+            ]);
+        } else {
             return response()->json([
                 "message" => "Mot de passe incorrect",
                 "status" => 401,
             ]);
         }
-
-        // retirer le token associé à l'utilisateur dans la base de données
-        $user->tokens()->delete();
-
-        // supprimer l'utilisateur
-        $user->delete();
-        // retourner la réponse
-        return response()->json([
-            "message" => "Utilisateur supprimé avec succès",
-            "status" => 200,
-        ]);
     }
 
     // public function resetPassword(Request $request)

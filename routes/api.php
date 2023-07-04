@@ -37,6 +37,7 @@ Route::get("/articles", [ArticlesController::class, "index"]);
 Route::get("/articles/{idArticle}", [ArticlesController::class, "show"]);
 
 // for research
+
 Route::get('/articles', [ArticlesController::class, "searchByCategorie"]);
 
 // for filter

@@ -2,17 +2,25 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Repositories\CreateurRepository;
 use App\Mail\InscriptionCreateurMail;
 use App\Models\Createur;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class CreateurController extends Controller
 {
+
+    private $createurRepository;
+
+    public function __construct(CreateurRepository $createurRepository)
+    {
+        $this->createurRepository = $createurRepository;
+    }
+
     public function createCreateur(Request $request)
     {
         // créer un createur
@@ -32,12 +40,11 @@ class CreateurController extends Controller
             "debutActivite" => ["nullable", "date"],
             "siret" => ["required", "integer", "min:14"],
         ]);
-        // hasher le mot de passe
-        $createurDonnee["mdpCreateur"] = Hash::make($createurDonnee["mdpCreateur"]);
-        // enregistrer le createur dans la base de données
-        $createur = Createur::create($createurDonnee);
-        // retourner la réponse quand le createur est créé
 
+        // enregistrer le createur dans la base de données
+        $createur = $this->createurRepository->createCreateur($createurDonnee);
+
+        // retourner la réponse quand le createur est créé
         Mail::to($createurDonnee["email"])->send(new InscriptionCreateurMail($createurDonnee));
 
         return response()->json([
@@ -74,17 +81,8 @@ class CreateurController extends Controller
 
     public function getCreateurs()
     {
-        // récupérer tous les createurs
-        $createurs = Createur::all();
-        // ne renvoyer que le prénom et la date de naissance de chaque createur
-        $createurs = $createurs->map(function ($createur) {
-            return [
-                'genre' => $createur->genre,
-                'nom' => $createur->nom,
-                'prenom' => $createur->prenom,
-                'email' => $createur->email,
-            ];
-        });
+        // récupérer tous les createurs à partir de CreateurRepository
+        $createurs = $this->createurRepository->getAllCreateurs();
         // retourner la réponse
         return response()->json([
             "createurs" => $createurs,
@@ -99,8 +97,10 @@ class CreateurController extends Controller
             "email" => ["required", "string", "email", "max:40"],
             "mdpCreateur" => ["required", "string", "min:8", "max:30"],
         ]);
-        // vérifier si le createur existe avec le bon mot de passe
-        $createur = Createur::where("email", $createurDonnee["email"])->first();
+
+        // récupérer le createur par son email à partir de CreateurRepository
+        $createur = $this->createurRepository->findByEmail($createurDonnee["email"]);
+
         if (!$createur || !Hash::check($createurDonnee["mdpCreateur"], $createur->mdpCreateur)) {
             return response()->json([
                 "message" => "Email ou mot de passe incorrect",
@@ -152,24 +152,8 @@ class CreateurController extends Controller
         // fusionner les données validées avec les données actuelles
         $updatedData = array_merge($currentDonnee, array_filter($createurDonnee));
 
-        // mettre à jour les données de le createur
-        $result = DB::table('createurs')
-            ->where('idCreateur', $createurDonnee['idCreateur'])
-            ->update([
-                'nom' => $updatedData['nom'],
-                'prenom' => $updatedData['prenom'],
-                'dateNaissance' => $updatedData['dateNaissance'],
-                'email' => $updatedData['email'],
-                'mdpCreateur' => $updatedData['mdpCreateur'],
-                'telCreateur' => $updatedData['telCreateur'],
-                'numRue' => $updatedData['numRue'],
-                'rue' => $updatedData['rue'],
-                'codePostal' => $updatedData['codePostal'],
-                'ville' => $updatedData['ville'],
-                'pays' => $updatedData['pays'],
-                'debutActivite' => $updatedData['debutActivite'],
-                'siret' => $updatedData['siret'],
-            ]);
+        // mettre à jour les données de le createur à partir de CreateurRepository
+        $result = $this->createurRepository->updateCreateur($createurDonnee['idCreateur'], $updatedData);
 
         // retourner la réponse quand le createur est mis à jour
         if ($result) {
@@ -192,26 +176,19 @@ class CreateurController extends Controller
             'mdpCreateur' => ['required', 'string', 'min:8', 'max:30'],
         ]);
 
-        // récupérer l'id de l'utilisateur
-        $createur = Createur::findorFail($idCreateur);
+        // récupérer le createur par son id à partir de CreateurRepository
+        $result = $this->createurRepository->deleteCreateur($idCreateur, $request->mdpCreateur);
 
-        // vérifier si le mot de passe est correct
-        if (!Hash::check($request->mdpCreateur, $createur->mdpCreateur)) {
+        if ($result) {
             return response()->json([
-                "message" => "Mot de passe incorrect",
+                "message" => "Utilisateur supprimé avec succès",
+                "status" => 200,
+            ]);
+        } else {
+            return response()->json([
+                "message" => "Mot de passe incorrect ou utilisateur non trouvé",
                 "status" => 401,
             ]);
         }
-
-        // retirer le token associé à l'utilisateur dans la base de données
-        $createur->tokens()->delete();
-
-        // supprimer l'utilisateur
-        $createur->delete();
-        // retourner la réponse
-        return response()->json([
-            "message" => "Utilisateur supprimé avec succès",
-            "status" => 200,
-        ]);
     }
 }
